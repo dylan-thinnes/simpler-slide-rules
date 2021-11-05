@@ -51,10 +51,21 @@ pub struct Tick {
     meta: TickMeta
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TickMeta {
     label: Option<String>,
     height: IF
+}
+
+impl Tick {
+    fn new (pre_pos: IF, meta: &TickMeta, config: &Config) -> Self {
+        let post_pos = (config.post_transform)(pre_pos);
+
+        Tick {
+            pre_pos, post_pos,
+            meta: meta.clone()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -71,22 +82,12 @@ impl Marks {
         }
     }
 
-    fn insert (&mut self, config: &Config, x: IF) -> bool {
-        let y = (config.post_transform)(x);
-        let tick = Tick {
-            pre_pos: x,
-            post_pos: y,
-            meta: TickMeta {
-                label: None,
-                height: 1.
-            }
-        };
-
-        let insertion_successful = self.occupied_positions.insert(not_nan(y));
+    fn insert (&mut self, tick: Tick) -> bool {
+        let insertion_successful = self.occupied_positions.insert(not_nan(tick.post_pos));
         let already_occupied = !insertion_successful;
 
         if already_occupied {
-            eprintln!("Position x: {}, post: {} was already occupied!", x, y);
+            eprintln!("Position x: {}, post: {} was already occupied!", tick.pre_pos, tick.post_pos);
         }
 
         self.ticks.push(tick);
@@ -233,7 +234,8 @@ impl PartitionSpec<'_> {
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                local_marks.insert(config, point);
+                let tick = Tick::new(point, &TickMeta { height: 0.1, label: None }, config);
+                local_marks.insert(tick);
             }
 
             // handle end of subrange
@@ -243,7 +245,8 @@ impl PartitionSpec<'_> {
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                local_marks.insert(config, point);
+                let tick = Tick::new(point, &TickMeta { height: 0.1, label: None }, config);
+                local_marks.insert(tick);
             }
         }
 
