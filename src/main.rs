@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use ordered_float::NotNan;
 
 type InternalFloat = f64;
@@ -145,6 +146,7 @@ pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).unwrap() }
 pub struct PartitionSpec<'a> {
     quantities: Vec<IF>,
     base_interval_height: IF,
+    override_tick_heights: &'a BTreeMap<usize, IF>,
     next_specs: IndexingSpec<'a>
 }
 
@@ -245,7 +247,16 @@ impl PartitionSpec<'_> {
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                let tick_meta = TickMeta { height: subinterval.height, label: None };
+                let overridden_height = match self.override_tick_heights.get(&i) {
+                    Some(factor) => interval.height * factor,
+                    None => subinterval.height
+                };
+
+                let tick_meta = TickMeta {
+                    height: overridden_height,
+                    label: None
+                };
+
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);
             }
@@ -257,7 +268,15 @@ impl PartitionSpec<'_> {
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                let tick_meta = TickMeta { height: subinterval.height, label: None };
+                let overridden_height = match self.override_tick_heights.get(&(i + 1)) {
+                    Some(factor) => interval.height * factor,
+                    None => subinterval.height
+                };
+
+                let tick_meta = TickMeta {
+                    height: overridden_height,
+                    label: None
+                };
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);
             }
