@@ -9,19 +9,39 @@ pub fn main () {
     let div5_spec = PartitionSpec {
         quantities: vec![1.,1.,1.,1.,1.],
         base_interval_height: 0.66,
+        override_tick_heights: &BTreeMap::new(),
         next_specs: IndexingSpec::Nothing
     };
 
     let div2_spec = PartitionSpec {
         quantities: vec![1.,1.],
         base_interval_height: 0.75,
+        override_tick_heights: &BTreeMap::new(),
         next_specs: IndexingSpec::AllSame(&div5_spec)
+    };
+
+    let mut fifth_tick_higher = BTreeMap::new();
+    fifth_tick_higher.insert(5, 1.25);
+
+    let div10_spec_ = PartitionSpec {
+        quantities: repeat(10),
+        base_interval_height: 0.5,
+        override_tick_heights: &fifth_tick_higher,
+        next_specs: IndexingSpec::Nothing
+    };
+
+    let div10_spec = PartitionSpec {
+        quantities: repeat(10),
+        base_interval_height: 0.5,
+        override_tick_heights: &fifth_tick_higher,
+        next_specs: IndexingSpec::AllSame(&div10_spec_)
     };
 
     let c_spec = PartitionSpec {
         quantities: repeat(9),
         base_interval_height: 0.1,
-        next_specs: IndexingSpec::AllDifferent(&div2_spec)
+        override_tick_heights: &BTreeMap::new(),
+        next_specs: IndexingSpec::AllDifferent(&div10_spec)
     };
 
     let config = Config {
