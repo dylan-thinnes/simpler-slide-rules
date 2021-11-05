@@ -7,16 +7,19 @@ type IF = InternalFloat;
 pub fn main () {
     let div5_spec = PartitionSpec {
         quantities: vec![1.,1.,1.,1.,1.],
+        interval_heights: 0.66,
         next_specs: IndexingSpec::Nothing
     };
 
     let div2_spec = PartitionSpec {
         quantities: vec![1.,1.],
+        interval_heights: 0.75,
         next_specs: IndexingSpec::AllSame(&div5_spec)
     };
 
     let c_spec = PartitionSpec {
         quantities: repeat(9),
+        interval_heights: 0.1,
         next_specs: IndexingSpec::AllDifferent(&div2_spec)
     };
 
@@ -27,7 +30,7 @@ pub fn main () {
         }
     };
 
-    let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 0.1 }, &config);
+    let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
     for mark in marks.ticks {
         println!("line\r\n{},0\r\n{},{}", mark.post_pos, mark.post_pos, mark.meta.height);
     }
@@ -141,6 +144,7 @@ pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).unwrap() }
 
 pub struct PartitionSpec<'a> {
     quantities: Vec<IF>,
+    interval_heights: IF,
     next_specs: IndexingSpec<'a>
 }
 
@@ -177,7 +181,7 @@ impl PartitionSpec<'_> {
         for quantity in self.quantities.iter() {
             let old_point = point;
             point += quantity * increment;
-            subranges.push(Interval { start: old_point, end: point, height: 0.5 * range.height });
+            subranges.push(Interval { start: old_point, end: point, height: self.interval_heights * range.height });
         }
 
         return subranges;
@@ -212,7 +216,6 @@ impl PartitionSpec<'_> {
                     for subrange in &subranges[start_idx..end_idx] {
                         next_spec.run((!is_first, false), subrange, config, committed_marks);
                     }
-
                 }
 
                 return true;
@@ -223,7 +226,6 @@ impl PartitionSpec<'_> {
     pub fn attempt (&self, inclusivity: (bool, bool), range: &Interval, config: &Config, committed_marks: &Marks) -> Option<(Marks, Vec<Interval>)> {
         let mut local_marks: Marks = Marks::new();
         let subranges = self.partition(range);
-        let tick_meta = TickMeta { height: range.height, label: None };
 
         for (i, subrange) in subranges.iter().enumerate() {
             let first: bool = i == 0;
@@ -236,6 +238,7 @@ impl PartitionSpec<'_> {
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
+                let tick_meta = TickMeta { height: subrange.height, label: None };
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);
             }
@@ -247,6 +250,7 @@ impl PartitionSpec<'_> {
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
+                let tick_meta = TickMeta { height: subrange.height, label: None };
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);
             }
