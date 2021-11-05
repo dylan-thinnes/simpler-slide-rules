@@ -5,35 +5,19 @@ type InternalFloat = f64;
 type IF = InternalFloat;
 
 pub fn main () {
-    /*
-    let mut marks: Marks = BTreeSet::new();
-    for i in 1..10 {
-        marks.insert(not_nan(i as InternalFloat));
-    }
-    marks.insert(not_nan(100.));
-    marks.insert(not_nan(1000.));
-
-    println!("{:?}", closest_gle(&marks, 0.99));
-    println!("{:?}", closest_gle(&marks, 1.));
-    println!("{:?}", closest_gle(&marks, 2.5));
-    println!("{:?}", closest_gle(&marks, 100.));
-    println!("{:?}", closest_gle(&marks, 101.));
-    println!("{:?}", closest_gle(&marks, 1001.));
-    */
-
     let div5_spec = PartitionSpec {
         quantities: vec![1.,1.,1.,1.,1.],
-        next_specs: vec![]
+        next_specs: IndexingSpec::Nothing
     };
 
     let div2_spec = PartitionSpec {
         quantities: vec![1.,1.],
-        next_specs: vec![(2, &div5_spec)]
+        next_specs: IndexingSpec::AllSame(&div5_spec)
     };
 
     let c_spec = PartitionSpec {
-        quantities: (1 .. 10).map(|_| 1.).collect(),
-        next_specs: (1 .. 10).map(|_| (1, &div2_spec)).collect(),
+        quantities: repeat(9),
+        next_specs: IndexingSpec::AllDifferent(&div2_spec)
     };
 
     let marks = c_spec.run_top(&Interval { start: 1., end: 10. }, 0.0001);
@@ -81,14 +65,32 @@ pub fn closest_gle (marks: &Marks, point: IF) -> (Option<IF>, Option<IF>) {
 
 pub struct PartitionSpec<'a> {
     quantities: Vec<IF>,
-    next_specs: Vec<(u32, &'a PartitionSpec<'a>)>
+    next_specs: IndexingSpec<'a>
 }
 
-//pub enum IndexingSpec {
-//    AllSame(PartitionSpec),
-//    AllDifferent(PartitionSpec),
-//    Custom(Vec<(u32, PartitionSpec)>)
-//}
+pub fn repeat (count: usize) -> Vec<IF> {
+    (0..count).map(|_| 1.).collect()
+}
+
+pub enum IndexingSpec<'a> {
+    AllSame(&'a PartitionSpec<'a>),
+    AllDifferent(&'a PartitionSpec<'a>),
+    Individual(Vec<&'a PartitionSpec<'a>>),
+    Custom(Vec<(usize, &'a PartitionSpec<'a>)>),
+    Nothing
+}
+
+impl<'a> IndexingSpec<'a> {
+    fn to_vec (&'a self, maximum: usize) -> Vec<(usize, &'a PartitionSpec<'a>)> {
+        match self {
+            IndexingSpec::AllSame(spec)      => vec![(maximum, spec)],
+            IndexingSpec::AllDifferent(spec) => (0..maximum).map(|_| (1, *spec)).collect(),
+            IndexingSpec::Individual(specs)  => specs.into_iter().map(|&spec| (1, spec)).collect(),
+            IndexingSpec::Custom(specs)      => specs.to_vec(),
+            IndexingSpec::Nothing            => vec![]
+        }
+    }
+}
 
 impl PartitionSpec<'_> {
     pub fn partition (&self, range: &Interval) -> Vec<Interval> {
@@ -125,13 +127,13 @@ impl PartitionSpec<'_> {
                     committed_marks.insert(mark);
                 }
 
-                let mut subrange_idx = 0;
-                for (i, (glob_subranges, next_spec)) in self.next_specs.iter().enumerate() {
+                let mut subrange_idx: usize = 0;
+                for (i, (glob_subranges, next_spec)) in self.next_specs.to_vec(self.quantities.len()).iter().enumerate() {
                     let is_first = i == 0;
 
-                    let start_idx = subrange_idx as usize;
+                    let start_idx = subrange_idx;
                     subrange_idx += glob_subranges;
-                    let end_idx = subrange_idx as usize;
+                    let end_idx = subrange_idx;
 
                     for subrange in &subranges[start_idx..end_idx] {
                         next_spec.run((!is_first, false), subrange, minimum_distance, committed_marks);
