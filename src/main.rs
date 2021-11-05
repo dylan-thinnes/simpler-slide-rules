@@ -7,19 +7,19 @@ type IF = InternalFloat;
 pub fn main () {
     let div5_spec = PartitionSpec {
         quantities: vec![1.,1.,1.,1.,1.],
-        interval_heights: 0.66,
+        base_interval_height: 0.66,
         next_specs: IndexingSpec::Nothing
     };
 
     let div2_spec = PartitionSpec {
         quantities: vec![1.,1.],
-        interval_heights: 0.75,
+        base_interval_height: 0.75,
         next_specs: IndexingSpec::AllSame(&div5_spec)
     };
 
     let c_spec = PartitionSpec {
         quantities: repeat(9),
-        interval_heights: 0.1,
+        base_interval_height: 0.1,
         next_specs: IndexingSpec::AllDifferent(&div2_spec)
     };
 
@@ -144,7 +144,7 @@ pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).unwrap() }
 
 pub struct PartitionSpec<'a> {
     quantities: Vec<IF>,
-    interval_heights: IF,
+    base_interval_height: IF,
     next_specs: IndexingSpec<'a>
 }
 
@@ -173,48 +173,55 @@ impl<'a> IndexingSpec<'a> {
 }
 
 impl PartitionSpec<'_> {
-    pub fn partition (&self, range: &Interval) -> Vec<Interval> {
-        let increment = (range.end - range.start) / self.quantities.iter().sum::<IF>();
-        let mut subranges = vec![];
-        let mut point = range.start;
+    pub fn partition (&self, interval: &Interval) -> Vec<Interval> {
+        let increment = (interval.end - interval.start) / self.quantities.iter().sum::<IF>();
+        let mut subintervals = vec![];
+        let mut point = interval.start;
 
         for quantity in self.quantities.iter() {
             let old_point = point;
             point += quantity * increment;
-            subranges.push(Interval { start: old_point, end: point, height: self.interval_heights * range.height });
+
+            let subinterval = Interval {
+                start: old_point,
+                end: point,
+                height: self.base_interval_height * interval.height
+            };
+
+            subintervals.push(subinterval);
         }
 
-        return subranges;
+        return subintervals;
     }
 
-    pub fn run_top (&self, range: &Interval, config: &Config) -> Marks {
+    pub fn run_top (&self, interval: &Interval, config: &Config) -> Marks {
         let mut committed_marks = Marks::new();
         let inclusivity = (true, true);
 
-        self.run(inclusivity, range, config, &mut committed_marks);
+        self.run(inclusivity, interval, config, &mut committed_marks);
         return committed_marks;
     }
 
-    pub fn run (&self, inclusivity: (bool, bool), range: &Interval, config: &Config, committed_marks: &mut Marks) -> bool {
-        let attempt_result = self.attempt(inclusivity, range, config, committed_marks);
+    pub fn run (&self, inclusivity: (bool, bool), interval: &Interval, config: &Config, committed_marks: &mut Marks) -> bool {
+        let attempt_result = self.attempt(inclusivity, interval, config, committed_marks);
 
         match attempt_result {
             None => {
                 return false;
             },
-            Some((local_marks, subranges)) => {
+            Some((local_marks, subintervals)) => {
                 committed_marks.merge(local_marks);
 
-                let mut subrange_idx: usize = 0;
-                for (i, (glob_subranges, next_spec)) in self.next_specs.to_vec(self.quantities.len()).iter().enumerate() {
+                let mut subinterval_idx: usize = 0;
+                for (i, (glob_subintervals, next_spec)) in self.next_specs.to_vec(self.quantities.len()).iter().enumerate() {
                     let is_first = i == 0;
 
-                    let start_idx = subrange_idx;
-                    subrange_idx += glob_subranges;
-                    let end_idx = subrange_idx;
+                    let start_idx = subinterval_idx;
+                    subinterval_idx += glob_subintervals;
+                    let end_idx = subinterval_idx;
 
-                    for subrange in &subranges[start_idx..end_idx] {
-                        next_spec.run((!is_first, false), subrange, config, committed_marks);
+                    for subinterval in &subintervals[start_idx..end_idx] {
+                        next_spec.run((!is_first, false), subinterval, config, committed_marks);
                     }
                 }
 
@@ -223,40 +230,40 @@ impl PartitionSpec<'_> {
         }
     }
 
-    pub fn attempt (&self, inclusivity: (bool, bool), range: &Interval, config: &Config, committed_marks: &Marks) -> Option<(Marks, Vec<Interval>)> {
+    pub fn attempt (&self, inclusivity: (bool, bool), interval: &Interval, config: &Config, committed_marks: &Marks) -> Option<(Marks, Vec<Interval>)> {
         let mut local_marks: Marks = Marks::new();
-        let subranges = self.partition(range);
+        let subintervals = self.partition(interval);
 
-        for (i, subrange) in subranges.iter().enumerate() {
+        for (i, subinterval) in subintervals.iter().enumerate() {
             let first: bool = i == 0;
-            let last: bool = i == subranges.len() - 1;
+            let last: bool = i == subintervals.len() - 1;
 
-            // handle front of subrange
+            // handle front of subinterval
             if !first || inclusivity.0 {
-                let point = subrange.start;
+                let point = subinterval.start;
 
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                let tick_meta = TickMeta { height: subrange.height, label: None };
+                let tick_meta = TickMeta { height: subinterval.height, label: None };
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);
             }
 
-            // handle end of subrange
+            // handle end of subinterval
             if last && inclusivity.1 {
-                let point = subrange.end;
+                let point = subinterval.end;
 
                 if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
                 if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                let tick_meta = TickMeta { height: subrange.height, label: None };
+                let tick_meta = TickMeta { height: subinterval.height, label: None };
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);
             }
         }
 
-        return Some((local_marks, subranges));
+        return Some((local_marks, subintervals));
     }
 }
 
