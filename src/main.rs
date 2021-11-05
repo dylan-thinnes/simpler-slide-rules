@@ -20,8 +20,22 @@ pub fn main () {
         next_specs: IndexingSpec::AllDifferent(&div2_spec)
     };
 
-    let marks = c_spec.run_top(&Interval { start: 1., end: 10. }, 0.0001);
-    println!("{:?}", marks);
+    let config = Config {
+        minimum_distance: 0.,
+        post_transform: |x| {
+            x.log(10.)
+        }
+    };
+
+    let marks = c_spec.run_top(&Interval { start: 1., end: 10. }, &config);
+    for mark in marks.ticks {
+        println!("line\r\n{},0\r\n{},{}", mark.post_pos, mark.post_pos, mark.meta.height);
+    }
+}
+
+pub struct Config {
+    minimum_distance: IF,
+    post_transform: fn(IF) -> IF
 }
 
 #[derive(Debug)]
@@ -30,38 +44,98 @@ pub struct Interval {
     end: IF
 }
 
-type Marks = BTreeSet<NotNan<IF>>;
+#[derive(Debug)]
+pub struct Tick {
+    pre_pos: IF,
+    post_pos: IF,
+    meta: TickMeta
+}
+
+#[derive(Debug)]
+pub struct TickMeta {
+    label: Option<String>,
+    height: IF
+}
+
+#[derive(Debug)]
+pub struct Marks {
+    occupied_positions: BTreeSet<NotNan<IF>>,
+    ticks: Vec<Tick>
+}
+
+impl Marks {
+    fn new () -> Self {
+        Marks {
+            occupied_positions: BTreeSet::new(),
+            ticks: vec![]
+        }
+    }
+
+    fn insert (&mut self, config: &Config, x: IF) -> bool {
+        let y = (config.post_transform)(x);
+        let tick = Tick {
+            pre_pos: x,
+            post_pos: y,
+            meta: TickMeta {
+                label: None,
+                height: 1.
+            }
+        };
+
+        let insertion_successful = self.occupied_positions.insert(not_nan(y));
+        let already_occupied = !insertion_successful;
+
+        if already_occupied {
+            eprintln!("Position x: {}, post: {} was already occupied!", x, y);
+        }
+
+        self.ticks.push(tick);
+
+        return already_occupied;
+    }
+
+    fn merge (&mut self, other: Self) {
+        for x_notnan in other.occupied_positions {
+            self.occupied_positions.insert(x_notnan);
+        }
+
+        for tick in other.ticks {
+            self.ticks.push(tick);
+        }
+    }
+
+    pub fn no_overlap (&self, point: IF, minimum_distance: InternalFloat) -> bool {
+        let (ge, le) = self.closest_gle(point);
+
+        if let Some(le) = le {
+            let le_delta = (le - point).abs();
+            if minimum_distance > le_delta {
+                return false;
+            }
+        }
+
+        if let Some(ge) = ge {
+            let ge_delta = (ge - point).abs();
+            if minimum_distance > ge_delta {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    pub fn closest_gle (&self, point: IF) -> (Option<IF>, Option<IF>) {
+        let le_notnan = self.occupied_positions.range(..=not_nan(point)).next_back();
+        let ge_notnan = self.occupied_positions.range(not_nan(point)..).next();
+
+        let le = le_notnan.map(|x| x.into_inner());
+        let ge = ge_notnan.map(|x| x.into_inner());
+
+        return (le, ge);
+    }
+}
+
 pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).unwrap() }
-
-pub fn no_overlap (marks: &Marks, point: IF, minimum_distance: InternalFloat) -> bool {
-    let (ge, le) = closest_gle(marks, point);
-
-    if let Some(le) = le {
-        let le_delta = (le - point).abs();
-        if minimum_distance > le_delta {
-            return false;
-        }
-    }
-
-    if let Some(ge) = ge {
-        let ge_delta = (ge - point).abs();
-        if minimum_distance > ge_delta {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-pub fn closest_gle (marks: &Marks, point: IF) -> (Option<IF>, Option<IF>) {
-    let le_notnan = marks.range(..=not_nan(point)).next_back();
-    let ge_notnan = marks.range(not_nan(point)..).next();
-
-    let le = le_notnan.map(|x| x.into_inner());
-    let ge = ge_notnan.map(|x| x.into_inner());
-
-    return (le, ge);
-}
 
 pub struct PartitionSpec<'a> {
     quantities: Vec<IF>,
@@ -107,25 +181,23 @@ impl PartitionSpec<'_> {
         return subranges;
     }
 
-    pub fn run_top (&self, range: &Interval, minimum_distance: IF) -> Marks {
-        let mut committed_marks = BTreeSet::new();
+    pub fn run_top (&self, range: &Interval, config: &Config) -> Marks {
+        let mut committed_marks = Marks::new();
         let inclusivity = (true, true);
 
-        self.run(inclusivity, range, minimum_distance, &mut committed_marks);
+        self.run(inclusivity, range, config, &mut committed_marks);
         return committed_marks;
     }
 
-    pub fn run (&self, inclusivity: (bool, bool), range: &Interval, minimum_distance: IF, committed_marks: &mut Marks) -> bool {
-        let attempt_result = self.attempt(inclusivity, range, minimum_distance, committed_marks);
+    pub fn run (&self, inclusivity: (bool, bool), range: &Interval, config: &Config, committed_marks: &mut Marks) -> bool {
+        let attempt_result = self.attempt(inclusivity, range, config, committed_marks);
 
         match attempt_result {
             None => {
                 return false;
             },
             Some((local_marks, subranges)) => {
-                for mark in local_marks {
-                    committed_marks.insert(mark);
-                }
+                committed_marks.merge(local_marks);
 
                 let mut subrange_idx: usize = 0;
                 for (i, (glob_subranges, next_spec)) in self.next_specs.to_vec(self.quantities.len()).iter().enumerate() {
@@ -136,7 +208,7 @@ impl PartitionSpec<'_> {
                     let end_idx = subrange_idx;
 
                     for subrange in &subranges[start_idx..end_idx] {
-                        next_spec.run((!is_first, false), subrange, minimum_distance, committed_marks);
+                        next_spec.run((!is_first, false), subrange, config, committed_marks);
                     }
 
                 }
@@ -146,8 +218,8 @@ impl PartitionSpec<'_> {
         }
     }
 
-    pub fn attempt (&self, inclusivity: (bool, bool), range: &Interval, minimum_distance: IF, committed_marks: &Marks) -> Option<(Marks, Vec<Interval>)> {
-        let mut local_marks: Marks = BTreeSet::new();
+    pub fn attempt (&self, inclusivity: (bool, bool), range: &Interval, config: &Config, committed_marks: &Marks) -> Option<(Marks, Vec<Interval>)> {
+        let mut local_marks: Marks = Marks::new();
         let subranges = self.partition(range);
 
         for (i, subrange) in subranges.iter().enumerate() {
@@ -158,20 +230,20 @@ impl PartitionSpec<'_> {
             if !first || inclusivity.0 {
                 let point = subrange.start;
 
-                if !no_overlap(committed_marks, point, minimum_distance) { return None; }
-                if !no_overlap(&local_marks, point, minimum_distance) { return None; }
+                if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
+                if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                local_marks.insert(not_nan(point));
+                local_marks.insert(config, point);
             }
 
             // handle end of subrange
             if last && inclusivity.1 {
                 let point = subrange.end;
 
-                if !no_overlap(committed_marks, point, minimum_distance) { return None; }
-                if !no_overlap(&local_marks, point, minimum_distance) { return None; }
+                if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
+                if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
-                local_marks.insert(not_nan(point));
+                local_marks.insert(config, point);
             }
         }
 
