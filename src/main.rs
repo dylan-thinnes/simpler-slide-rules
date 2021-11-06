@@ -6,27 +6,13 @@ type InternalFloat = f64;
 type IF = InternalFloat;
 
 pub fn main () {
-    let div5_spec = PartitionSpec {
-        quantities: vec![1.,1.,1.,1.,1.],
-        base_interval_height: 0.66,
-        override_tick_heights: &BTreeMap::new(),
-        next_specs: IndexingSpec::Nothing
-    };
-
-    let div2_spec = PartitionSpec {
-        quantities: vec![1.,1.],
-        base_interval_height: 0.75,
-        override_tick_heights: &BTreeMap::new(),
-        next_specs: IndexingSpec::AllSame(&div5_spec)
-    };
-
     let mut fifth_tick_higher = BTreeMap::new();
-    fifth_tick_higher.insert(5, 1.25);
+    fifth_tick_higher.insert(5, 0.75);
 
     let div10_spec_ = PartitionSpec {
         quantities: repeat(10),
         base_interval_height: 0.5,
-        override_tick_heights: &fifth_tick_higher,
+        override_tick_heights: &BTreeMap::new(),
         next_specs: IndexingSpec::Nothing
     };
 
