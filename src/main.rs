@@ -264,7 +264,7 @@ impl PartitionSpec<'_> {
 
                 let overridden_height = match self.override_tick_heights.get(&i) {
                     Some(factor) => interval.height * factor,
-                    None => subinterval.height
+                    None => interval.height * self.base_interval_height
                 };
 
                 let tick_meta = TickMeta {
@@ -285,7 +285,7 @@ impl PartitionSpec<'_> {
 
                 let overridden_height = match self.override_tick_heights.get(&(i + 1)) {
                     Some(factor) => interval.height * factor,
-                    None => subinterval.height
+                    None => interval.height * self.base_interval_height
                 };
 
                 let tick_meta = TickMeta {
