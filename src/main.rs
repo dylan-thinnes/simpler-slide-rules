@@ -238,7 +238,7 @@ impl PartitionSpec<'_> {
                     let end_idx = subinterval_idx;
 
                     for subinterval in &subintervals[start_idx..end_idx] {
-                        next_spec.run((!is_first, false), subinterval, config, committed_marks);
+                        next_spec.run((false, false), subinterval, config, committed_marks);
                     }
                 }
 
