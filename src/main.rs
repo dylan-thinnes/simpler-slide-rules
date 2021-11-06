@@ -38,8 +38,8 @@ pub fn main () {
     };
 
     let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
-    for mark in marks.ticks {
-        println!("line\r\n{},0\r\n{},{}", mark.post_pos, mark.post_pos, mark.meta.height);
+    for tick in marks.ticks {
+        tick.to_json();
     }
 }
 
@@ -76,6 +76,15 @@ impl Tick {
             pre_pos, post_pos,
             meta: meta.clone()
         }
+    }
+
+    fn to_json (&self) {
+        println!
+          ( "{{ \"pre_pos\": {}, \"post_pos\": {}, \"height\": {} }}"
+          , self.pre_pos
+          , self.post_pos
+          , self.meta.height
+          )
     }
 }
 
