@@ -153,8 +153,9 @@ impl Marks {
         }
     }
 
-    pub fn no_overlap (&self, point: IF, minimum_distance: InternalFloat) -> bool {
-        let (ge, le) = self.closest_gle(point);
+    pub fn no_overlap (&self, tick: &Tick, minimum_distance: InternalFloat) -> bool {
+        let point = tick.post_pos;
+        let (le, ge) = self.closest_gle(point);
 
         if let Some(le) = le {
             let le_delta = (le - point).abs();
@@ -287,9 +288,6 @@ impl PartitionSpec<'_> {
             if !first || inclusivity.0 {
                 let point = subinterval.start;
 
-                if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
-                if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
-
                 let overridden_height = match self.override_tick_heights.get(&i) {
                     Some(factor) => interval.height * factor,
                     None => interval.height * self.base_interval_height
@@ -302,15 +300,16 @@ impl PartitionSpec<'_> {
                 };
 
                 let tick = Tick::new(point, &tick_meta, config);
+
+                if !committed_marks.no_overlap(&tick, config.minimum_distance) { return None; }
+                if !local_marks.no_overlap(&tick, config.minimum_distance) { return None; }
+
                 local_marks.insert(tick);
             }
 
             // handle end of subinterval
             if last && inclusivity.1 {
                 let point = subinterval.end;
-
-                if !committed_marks.no_overlap(point, config.minimum_distance) { return None; }
-                if !local_marks.no_overlap(point, config.minimum_distance) { return None; }
 
                 let overridden_height = match self.override_tick_heights.get(&(i + 1)) {
                     Some(factor) => interval.height * factor,
@@ -322,7 +321,12 @@ impl PartitionSpec<'_> {
                     label: None,
                     offset: TickOffset::Vertical(0.)
                 };
+
                 let tick = Tick::new(point, &tick_meta, config);
+
+                if !committed_marks.no_overlap(&tick, config.minimum_distance) { return None; }
+                if !local_marks.no_overlap(&tick, config.minimum_distance) { return None; }
+
                 local_marks.insert(tick);
             }
         }
