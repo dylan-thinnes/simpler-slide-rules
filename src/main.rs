@@ -267,38 +267,40 @@ impl Marks {
 
 pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).unwrap() }
 
-pub struct PartitionSpec<'a> {
+#[derive(Clone)]
+pub struct PartitionSpec {
     quantities: Vec<IF>,
     base_interval_height: IF,
-    override_tick_heights: &'a BTreeMap<usize, IF>,
-    next_specs: IndexingSpec<'a>
+    override_tick_heights: BTreeMap<usize, IF>,
+    next_specs: IndexingSpec
 }
 
 pub fn repeat (count: usize) -> Vec<IF> {
     (0..count).map(|_| 1.).collect()
 }
 
-pub enum IndexingSpec<'a> {
-    AllSame(&'a PartitionSpec<'a>),
-    AllDifferent(&'a PartitionSpec<'a>),
-    Individual(Vec<&'a PartitionSpec<'a>>),
-    Custom(Vec<(usize, &'a PartitionSpec<'a>)>),
+#[derive(Clone)]
+pub enum IndexingSpec {
+    AllSame(Box<PartitionSpec>),
+    AllDifferent(Box<PartitionSpec>),
+    Individual(Vec<PartitionSpec>),
+    Custom(Vec<(usize, PartitionSpec)>),
     Nothing
 }
 
-impl<'a> IndexingSpec<'a> {
-    fn to_vec (&'a self, maximum: usize) -> Vec<(usize, &'a PartitionSpec<'a>)> {
+impl IndexingSpec {
+    fn to_vec (&self, maximum: usize) -> Vec<(usize, PartitionSpec)> {
         match self {
-            IndexingSpec::AllSame(spec)      => vec![(maximum, spec)],
-            IndexingSpec::AllDifferent(spec) => (0..maximum).map(|_| (1, *spec)).collect(),
-            IndexingSpec::Individual(specs)  => specs.into_iter().map(|&spec| (1, spec)).collect(),
+            IndexingSpec::AllSame(spec)      => vec![(maximum, (**spec).clone())],
+            IndexingSpec::AllDifferent(spec) => (0..maximum).map(|_| (1, (**spec).clone())).collect(),
+            IndexingSpec::Individual(specs)  => specs.into_iter().map(|spec| (1, spec.clone())).collect(),
             IndexingSpec::Custom(specs)      => specs.to_vec(),
             IndexingSpec::Nothing            => vec![]
         }
     }
 }
 
-impl PartitionSpec<'_> {
+impl PartitionSpec {
     pub fn partition (&self, interval: &Interval) -> Vec<Interval> {
         let increment = (interval.end - interval.start) / self.quantities.iter().sum::<IF>();
         let mut subintervals = vec![];
