@@ -39,7 +39,7 @@ pub fn main () {
 
     let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
     for tick in marks.ticks {
-        tick.to_json();
+        println!("{}", tick.to_json());
     }
 }
 
@@ -65,7 +65,34 @@ pub struct Tick {
 #[derive(Debug, Clone)]
 pub struct TickMeta {
     label: Option<String>,
-    height: IF
+    height: IF,
+    offset: TickOffset
+}
+
+#[derive(Debug, Clone)]
+pub enum TickOffset {
+    Radial(IF),
+    Vertical(IF)
+}
+
+impl TickOffset {
+    fn to_json (&self) -> String {
+        let tag = match self {
+            TickOffset::Radial(_) => "Radial",
+            TickOffset::Vertical(_) => "Vertical"
+        };
+
+        let value = match self {
+            TickOffset::Radial(f) => f,
+            TickOffset::Vertical(f) => f
+        };
+
+        format!
+          ( "{{ \"tag\": \"{}\", \"contents\": {} }}"
+          , tag
+          , value
+          )
+    }
 }
 
 impl Tick {
@@ -78,12 +105,13 @@ impl Tick {
         }
     }
 
-    fn to_json (&self) {
-        println!
-          ( "{{ \"pre_pos\": {}, \"post_pos\": {}, \"height\": {} }}"
+    fn to_json (&self) -> String {
+        format!
+          ( "{{ \"pre_pos\": {}, \"post_pos\": {}, \"height\": {}, \"offset\": {} }}"
           , self.pre_pos
           , self.post_pos
           , self.meta.height
+          , self.meta.offset.to_json()
           )
     }
 }
@@ -269,7 +297,8 @@ impl PartitionSpec<'_> {
 
                 let tick_meta = TickMeta {
                     height: overridden_height,
-                    label: None
+                    label: None,
+                    offset: TickOffset::Vertical(0.)
                 };
 
                 let tick = Tick::new(point, &tick_meta, config);
@@ -290,7 +319,8 @@ impl PartitionSpec<'_> {
 
                 let tick_meta = TickMeta {
                     height: overridden_height,
-                    label: None
+                    label: None,
+                    offset: TickOffset::Vertical(0.)
                 };
                 let tick = Tick::new(point, &tick_meta, config);
                 local_marks.insert(tick);

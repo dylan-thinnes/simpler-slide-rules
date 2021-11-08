@@ -151,6 +151,8 @@ data OffsetF a = Radial a | Vertical a
 
 instance NFData a => NFData (OffsetF a)
 
+instance FromJSON a => FromJSON (OffsetF a)
+
 type Offset = OffsetF InternalFloat
 type Offsetter = OffsetF (InternalFloat -> InternalFloat)
 
@@ -173,7 +175,7 @@ instance FromJSON Tick where
   parseJSON = withObject "Tick" $ \v -> do
     prePos <- v .: "pre_pos"
     postPos <- v .: "post_pos"
-    let offset = Vertical 0
+    offset <- v .:? "offset" .!= Vertical 0
     let _start = 0
     _end <- v .: "height"
     pure $ Tick { prePos, postPos, offset, info = TickInfo { _start, _end, _mlabel = Nothing } }
