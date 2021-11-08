@@ -38,7 +38,7 @@ pub fn main () {
     };
 
     let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
-    for tick in marks.ticks {
+    for tick in &marks.0[0].ticks {
         println!("{}", tick.to_json());
     }
 }
@@ -113,6 +113,86 @@ impl Tick {
           , self.meta.height
           , self.meta.offset.to_json()
           )
+    }
+}
+
+#[derive(Debug)]
+pub struct LayeredMarks(Vec<Marks>);
+
+impl LayeredMarks {
+    fn new () -> Self {
+        let mut s = LayeredMarks(vec![]);
+        s.new_layer();
+        return s;
+    }
+
+    fn new_layer (&mut self) {
+        self.0.push(Marks::new());
+    }
+
+    fn collapse_layer (&mut self) {
+        let top = self.0.pop().unwrap();
+        match self.0.last_mut() {
+            None => {
+                eprintln!("Warning: Tried to collapse only layer on LayeredMarks stack!");
+                self.0.push(top);
+            },
+            Some(new_top) => new_top.merge(top)
+        }
+    }
+
+    fn discard_layer (&mut self) {
+        if self.0.len() > 1 {
+            self.0.pop();
+        }
+    }
+
+    fn insert (&mut self, tick: Tick) -> bool {
+        self.0.last_mut().unwrap().insert(tick)
+    }
+
+    pub fn no_overlap (&self, tick: &Tick, minimum_distance: InternalFloat) -> bool {
+        let point = tick.post_pos;
+        let (le, ge) = self.closest_gle(point);
+
+        if let Some(le) = le {
+            let le_delta = (le - point).abs();
+            if minimum_distance > le_delta {
+                return false;
+            }
+        }
+
+        if let Some(ge) = ge {
+            let ge_delta = (ge - point).abs();
+            if minimum_distance > ge_delta {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    pub fn closest_gle (&self, point: IF) -> (Option<IF>, Option<IF>) {
+        let mut closest_le: Option<IF> = None;
+        let mut closest_ge: Option<IF> = None;
+
+        for layer in &self.0 {
+            let (le, ge) = layer.closest_gle(point);
+
+            closest_le = match (closest_le, le) {
+                (None, _) => le,
+                (_, None) => closest_le,
+                (Some(closest_le), Some(le)) => Some(closest_le.max(le))
+            };
+
+            closest_ge = match (closest_ge, ge) {
+                (None, _) => ge,
+                (_, None) => closest_ge,
+                (Some(closest_ge), Some(ge)) => Some(closest_ge.min(ge))
+            };
+        }
+
+        return (closest_le, closest_ge);
     }
 }
 
@@ -240,23 +320,25 @@ impl PartitionSpec<'_> {
         return subintervals;
     }
 
-    pub fn run_top (&self, interval: &Interval, config: &Config) -> Marks {
-        let mut committed_marks = Marks::new();
+    pub fn run_top (&self, interval: &Interval, config: &Config) -> LayeredMarks {
+        let mut committed_marks = LayeredMarks::new();
         let inclusivity = (true, true);
 
         self.run(inclusivity, interval, config, &mut committed_marks);
         return committed_marks;
     }
 
-    pub fn run (&self, inclusivity: (bool, bool), interval: &Interval, config: &Config, committed_marks: &mut Marks) -> bool {
+    pub fn run (&self, inclusivity: (bool, bool), interval: &Interval, config: &Config, committed_marks: &mut LayeredMarks) -> bool {
         let attempt_result = self.attempt(inclusivity, interval, config, committed_marks);
 
         match attempt_result {
             None => {
+                committed_marks.discard_layer();
+
                 return false;
             },
-            Some((local_marks, subintervals)) => {
-                committed_marks.merge(local_marks);
+            Some(subintervals) => {
+                committed_marks.collapse_layer();
 
                 let mut subinterval_idx: usize = 0;
                 for (i, (glob_subintervals, next_spec)) in self.next_specs.to_vec(self.quantities.len()).iter().enumerate() {
@@ -276,8 +358,8 @@ impl PartitionSpec<'_> {
         }
     }
 
-    pub fn attempt (&self, inclusivity: (bool, bool), interval: &Interval, config: &Config, committed_marks: &Marks) -> Option<(Marks, Vec<Interval>)> {
-        let mut local_marks: Marks = Marks::new();
+    pub fn attempt (&self, inclusivity: (bool, bool), interval: &Interval, config: &Config, committed_marks: &mut LayeredMarks) -> Option<Vec<Interval>> {
+        committed_marks.new_layer();
         let subintervals = self.partition(interval);
 
         for (i, subinterval) in subintervals.iter().enumerate() {
@@ -302,9 +384,8 @@ impl PartitionSpec<'_> {
                 let tick = Tick::new(point, &tick_meta, config);
 
                 if !committed_marks.no_overlap(&tick, config.minimum_distance) { return None; }
-                if !local_marks.no_overlap(&tick, config.minimum_distance) { return None; }
 
-                local_marks.insert(tick);
+                committed_marks.insert(tick);
             }
 
             // handle end of subinterval
@@ -325,13 +406,12 @@ impl PartitionSpec<'_> {
                 let tick = Tick::new(point, &tick_meta, config);
 
                 if !committed_marks.no_overlap(&tick, config.minimum_distance) { return None; }
-                if !local_marks.no_overlap(&tick, config.minimum_distance) { return None; }
 
-                local_marks.insert(tick);
+                committed_marks.insert(tick);
             }
         }
 
-        return Some((local_marks, subintervals));
+        return Some(subintervals);
     }
 }
 
