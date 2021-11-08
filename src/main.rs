@@ -6,29 +6,70 @@ type InternalFloat = f64;
 type IF = InternalFloat;
 
 pub fn main () {
-    let mut fifth_tick_higher = BTreeMap::new();
-    fifth_tick_higher.insert(5, 0.75);
+    let mut custom_next_specs = vec![];
 
-    let div10_spec_ = PartitionSpec {
-        quantities: repeat(10),
-        base_interval_height: 0.5,
-        override_tick_heights: &BTreeMap::new(),
+    let mut c_spec = PartitionSpec {
+        quantities: repeat(9),
+        base_interval_height: 0.02,
+        override_tick_heights: BTreeMap::new(),
         next_specs: IndexingSpec::Nothing
     };
 
-    let div10_spec = PartitionSpec {
+    let c1_spec = PartitionSpec {
         quantities: repeat(10),
-        base_interval_height: 0.5,
-        override_tick_heights: &fifth_tick_higher,
-        next_specs: IndexingSpec::AllSame(&div10_spec_)
+        base_interval_height: 0.8,
+        override_tick_heights: BTreeMap::new(),
+        next_specs: IndexingSpec::AllSame(Box::new(PartitionSpec {
+            quantities: repeat(2),
+            base_interval_height: 2./3.,
+            override_tick_heights: BTreeMap::new(),
+            next_specs: IndexingSpec::AllSame(Box::new(PartitionSpec {
+                quantities: repeat(5),
+                base_interval_height: 3./4.,
+                override_tick_heights: BTreeMap::new(),
+                next_specs: IndexingSpec::Nothing
+            }))
+        }))
     };
 
-    let c_spec = PartitionSpec {
-        quantities: repeat(9),
-        base_interval_height: 0.1,
-        override_tick_heights: &BTreeMap::new(),
-        next_specs: IndexingSpec::AllDifferent(&div10_spec)
+    let c2_3_spec = PartitionSpec {
+        quantities: repeat(2),
+        base_interval_height: 0.8,
+        override_tick_heights: BTreeMap::new(),
+        next_specs: IndexingSpec::AllSame(Box::new(PartitionSpec {
+            quantities: repeat(5),
+            base_interval_height: 2./3.,
+            override_tick_heights: BTreeMap::new(),
+            next_specs: IndexingSpec::AllSame(Box::new(PartitionSpec {
+                quantities: repeat(5),
+                base_interval_height: 3./4.,
+                override_tick_heights: BTreeMap::new(),
+                next_specs: IndexingSpec::Nothing
+            }))
+        }))
     };
+
+    let c4_9_spec = PartitionSpec {
+        quantities: repeat(2),
+        base_interval_height: 0.8,
+        override_tick_heights: BTreeMap::new(),
+        next_specs: IndexingSpec::AllSame(Box::new(PartitionSpec {
+            quantities: repeat(5),
+            base_interval_height: 2./3.,
+            override_tick_heights: BTreeMap::new(),
+            next_specs: IndexingSpec::AllSame(Box::new(PartitionSpec {
+                quantities: repeat(2),
+                base_interval_height: 3./4.,
+                override_tick_heights: BTreeMap::new(),
+                next_specs: IndexingSpec::Nothing
+            }))
+        }))
+    };
+
+    custom_next_specs.push((1, c1_spec));
+    custom_next_specs.push((2, c2_3_spec));
+    custom_next_specs.push((6, c4_9_spec));
+    c_spec.next_specs = IndexingSpec::Custom(custom_next_specs);
 
     let config = Config {
         minimum_distance: 0.,
