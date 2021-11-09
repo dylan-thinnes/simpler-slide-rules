@@ -89,11 +89,11 @@ pub fn main () {
     let config = Config {
         minimum_distance: 0.,
         post_transform: |x| {
-            x.log(10.)
+            x.log(100.)
         }
     };
 
-    let marks = spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
+    let marks = spec.run_top(&Interval { start: 1., end: 100., height: 1. }, &config);
     for tick in &marks.0[0].ticks {
         println!("{}", tick.to_json());
     }
