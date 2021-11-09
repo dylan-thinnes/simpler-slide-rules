@@ -10,7 +10,11 @@ range = { range_start ~ (".." ~ range_end)? }
 range_start = { integer }
 range_end = { integer }
 
-spec_tuple = { "(" ~ quantities ~ "," ~ tick_heights ~ ")" }
+format = { debug_format | hardcoded_format }
+debug_format = @{ "!" }
+hardcoded_format = @{ "\"" ~ (!"\"" ~ ANY) ~ "\"" }
+
+spec_tuple = { "(" ~ quantities ~ "," ~ tick_heights ~ ("," ~ format)? ~ ")" }
 spec_follow = { split_all | split_subset }
 split_all = { ">" ~ spec }
 split_subset = { "{" ~ ranged_spec ~ ("," ~ ranged_spec)* ~ ","? ~ "}" }

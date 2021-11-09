@@ -43,6 +43,7 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
     let mut spec_tuple_inners = spec_tuple.into_inner();
     let spec_tuple_quantities = spec_tuple_inners.next().unwrap();
     let spec_tuple_tick_heights = spec_tuple_inners.next().unwrap();
+    let spec_tuple_tick_format = spec_tuple_inners.next();
 
     let spec_tuple_quantities = spec_tuple_quantities.into_inner().next().unwrap();
     let quantities: Vec<IF> = match spec_tuple_quantities.as_rule() {
@@ -72,7 +73,17 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
         height: spec_tuple_tick_heights
                     .as_str().parse()
                     .expect("Spec tuple should have a float height."),
-        format: TickFormat::Nothing
+        format: match spec_tuple_tick_format {
+            None => TickFormat::Nothing,
+            Some(spec_tuple_tick_format) => {
+                let inner = spec_tuple_tick_format.into_inner().next().unwrap();
+                match inner.as_rule() {
+                    Rule::debug_format => TickFormat::Debug,
+                    Rule::hardcoded_format => TickFormat::Hardcoded(inner.as_str().to_string()),
+                    _ => panic!("Error: `format` ast node rule was not one of `debug_format` or `hardcoded_format`")
+                }
+            }
+        }
     };
 
     let next_specs = match may_spec_follow {
