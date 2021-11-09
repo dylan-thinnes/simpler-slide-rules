@@ -2,6 +2,14 @@ use std::collections::BTreeSet;
 use std::collections::BTreeMap;
 use ordered_float::NotNan;
 
+use pest::{Parser, iterators::Pair};
+use pest_derive::*;
+use std::fs;
+
+#[derive(Parser)]
+#[grammar = "grammar.pest"]
+struct Grammar;
+
 type InternalFloat = f64;
 type IF = InternalFloat;
 
@@ -81,6 +89,93 @@ pub fn main () {
     let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
     for tick in &marks.0[0].ticks {
         println!("{}", tick.to_json());
+    }
+}
+
+pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
+    assert_eq!(spec.as_rule(), Rule::spec);
+
+    let mut spec_inners = spec.into_inner();
+    let spec_tuple = spec_inners.next().unwrap();
+    let may_spec_follow = spec_inners.next();
+
+    let mut spec_tuple_inners = spec_tuple.into_inner();
+    let spec_tuple_quantities = spec_tuple_inners.next().unwrap();
+    let spec_tuple_tick_heights = spec_tuple_inners.next().unwrap();
+    let quantities =
+            spec_tuple_quantities
+                .as_str().parse()
+                .expect("Spec tuple should have an int.");
+    let base_interval_height: IF =
+            spec_tuple_tick_heights
+                .as_str().parse()
+                .expect("Spec tuple should have a float height.");
+
+    let next_specs = match may_spec_follow {
+        None => IndexingSpec::Nothing,
+        Some(spec_follow) => {
+            let spec_follow = spec_follow.into_inner().next().unwrap();
+            match spec_follow.as_rule() {
+                Rule::split_all => {
+                    let sub_spec_ast = spec_follow.into_inner().next().unwrap();
+                    let sub_spec = ast_spec_into_spec(sub_spec_ast);
+                    IndexingSpec::AllDifferent(Box::new(sub_spec))
+                },
+                Rule::split_subset => {
+                    let mut custom_next_specs = vec![];
+
+                    let mut last_idx = 0;
+                    for ranged_spec in spec_follow.into_inner() {
+                        let mut inners = ranged_spec.into_inner();
+
+                        let range = inners.next().unwrap();
+                        let mut range_start: Option<usize> = None;
+                        let mut range_end: Option<usize> = None;
+                        for inner in range.into_inner() {
+                            match inner.as_rule() {
+                                Rule::range_start => {
+                                    let s = inner.into_inner().next().unwrap().as_str();
+                                    let val = s.parse().unwrap();
+                                    range_start = Some(val);
+                                },
+                                Rule::range_end => {
+                                    let s = inner.into_inner().next().unwrap().as_str();
+                                    let val = s.parse().unwrap();
+                                    range_end = Some(val);
+                                },
+                                _ => {
+                                    panic!("Error: range contains a Pair that is not one of `range_start` or `range_end`");
+                                }
+                            }
+                        }
+
+                        let sub_spec = ast_spec_into_spec(inners.next().unwrap());
+                        let range_start = range_start.expect("Error: AST range does not have a start.");
+                        let range_end = range_end.unwrap_or(range_start);
+
+                        // check if we need to skip any
+                        if range_start - last_idx > 1 {
+                            custom_next_specs.push((range_start - last_idx - 1, None))
+                        }
+
+                        custom_next_specs.push((1 + range_end - range_start, Some(sub_spec)));
+
+                        last_idx = range_end;
+                    }
+
+                    IndexingSpec::Custom(custom_next_specs)
+                },
+                _ => {
+                    panic!("Error: spec_follow was not one of `split_all` or `split_subset`");
+                }
+            }
+        }
+    };
+
+    PartitionSpec {
+        base_interval_height, next_specs,
+        override_tick_heights: BTreeMap::new(),
+        quantities: repeat(quantities)
     }
 }
 
