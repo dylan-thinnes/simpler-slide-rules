@@ -17,11 +17,29 @@ pub fn main () {
     let args: Vec<String> = std::env::args().collect();
 
     // read
-    let target: String = args.get(1).cloned().unwrap_or("/dev/stdin".to_string());
+    let target: String = args.get(1).expect("Please supply a filename in the first argument.").clone();
     let src: String = match fs::read_to_string(&target) {
         Err(_) => panic!("Could not read target file '{}'.", &target),
         Ok(src) => src
     };
+
+    let start: IF =
+            args.get(2)
+                .expect("Please supply a range lower bound in the second argument.")
+                .parse()
+                .expect("Please supply a float for the range lower bound in the second argument.");
+
+    let end: IF =
+            args.get(3)
+                .expect("Please supply a range upper bound in the third argument.")
+                .parse()
+                .expect("Please supply a float for the range upper bound in the third argument.");
+
+    let base: IF =
+            args.get(4)
+                .expect("Please supply a log base in the fourth argument.")
+                .parse()
+                .expect("Please supply a float for the log base in the fourth argument.");
 
     // parse
     let top_level = Grammar::parse(Rule::top_level, &src).expect("Parse unsuccessful.").next().unwrap();
@@ -32,9 +50,9 @@ pub fn main () {
     // generate marks
     let config = Config {
         minimum_distance: 0.,
-        post_transform: |x| x.log(100.)
+        post_transform: Box::new(move |x| x.log(base))
     };
-    let marks = spec.run_top(&Interval { start: 1., end: 100., height: 1. }, &config);
+    let marks = spec.run_top(&Interval { start, end, height: 1. }, &config);
 
     // print JSON for marks
     for tick in &marks.0[0].ticks {
@@ -164,7 +182,7 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
 
 pub struct Config {
     minimum_distance: IF,
-    post_transform: fn(IF) -> IF
+    post_transform: Box<dyn Fn(IF) -> IF>
 }
 
 #[derive(Debug)]
