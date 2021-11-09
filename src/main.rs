@@ -441,9 +441,7 @@ impl PartitionSpec {
                 committed_marks.collapse_layer();
 
                 let mut subinterval_idx: usize = 0;
-                for (i, (glob_subintervals, next_spec)) in self.next_specs.to_vec(self.quantities.len()).iter().enumerate() {
-                    let is_first = i == 0;
-
+                for (glob_subintervals, next_spec) in self.next_specs.to_vec(self.quantities.len()).iter() {
                     let start_idx = subinterval_idx;
                     subinterval_idx += glob_subintervals;
                     let end_idx = subinterval_idx;
