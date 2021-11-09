@@ -14,7 +14,14 @@ type InternalFloat = f64;
 type IF = InternalFloat;
 
 pub fn main () {
-    let src = fs::read_to_string("example").expect("Could not read example.");
+    let args: Vec<String> = std::env::args().collect();
+
+    let target: String = args.get(1).cloned().unwrap_or("/dev/stdin".to_string());
+    let src: String = match fs::read_to_string(&target) {
+        Err(_) => panic!("Could not read target file '{}'.", &target),
+        Ok(src) => src
+    };
+
     let top_level = Grammar::parse(Rule::top_level, &src).expect("Parse unsuccessful.").next().unwrap();
     let ast_spec: Pair<Rule> = top_level.into_inner().next().unwrap();
     let spec: PartitionSpec = ast_spec_into_spec(ast_spec);
@@ -22,9 +29,7 @@ pub fn main () {
 
     let config = Config {
         minimum_distance: 0.,
-        post_transform: |x| {
-            x.log(100.)
-        }
+        post_transform: |x| x.log(100.)
     };
 
     let marks = spec.run_top(&Interval { start: 1., end: 100., height: 1. }, &config);
