@@ -66,9 +66,9 @@ pub fn main () {
         }))
     };
 
-    custom_next_specs.push((1, c1_spec));
-    custom_next_specs.push((2, c2_3_spec));
-    custom_next_specs.push((6, c4_9_spec));
+    custom_next_specs.push((1, Some(c1_spec)));
+    custom_next_specs.push((2, Some(c2_3_spec)));
+    custom_next_specs.push((6, Some(c4_9_spec)));
     c_spec.next_specs = IndexingSpec::Custom(custom_next_specs);
 
     let config = Config {
@@ -320,21 +320,21 @@ pub fn repeat (count: usize) -> Vec<IF> {
     (0..count).map(|_| 1.).collect()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum IndexingSpec {
     AllSame(Box<PartitionSpec>),
     AllDifferent(Box<PartitionSpec>),
     Individual(Vec<PartitionSpec>),
-    Custom(Vec<(usize, PartitionSpec)>),
+    Custom(Vec<(usize, Option<PartitionSpec>)>),
     Nothing
 }
 
 impl IndexingSpec {
-    fn to_vec (&self, maximum: usize) -> Vec<(usize, PartitionSpec)> {
+    fn to_vec (&self, maximum: usize) -> Vec<(usize, Option<PartitionSpec>)> {
         match self {
-            IndexingSpec::AllSame(spec)      => vec![(maximum, (**spec).clone())],
-            IndexingSpec::AllDifferent(spec) => (0..maximum).map(|_| (1, (**spec).clone())).collect(),
-            IndexingSpec::Individual(specs)  => specs.into_iter().map(|spec| (1, spec.clone())).collect(),
+            IndexingSpec::AllSame(spec)      => vec![(maximum, Some((**spec).clone()))],
+            IndexingSpec::AllDifferent(spec) => (0..maximum).map(|_| (1, Some((**spec).clone()))).collect(),
+            IndexingSpec::Individual(specs)  => specs.into_iter().map(|spec| (1, Some(spec.clone()))).collect(),
             IndexingSpec::Custom(specs)      => specs.to_vec(),
             IndexingSpec::Nothing            => vec![]
         }
@@ -391,8 +391,10 @@ impl PartitionSpec {
                     subinterval_idx += glob_subintervals;
                     let end_idx = subinterval_idx;
 
-                    for subinterval in &subintervals[start_idx..end_idx] {
-                        next_spec.run((false, false), subinterval, config, committed_marks);
+                    if let Some(next_spec) = next_spec {
+                        for subinterval in &subintervals[start_idx..end_idx] {
+                            next_spec.run((false, false), subinterval, config, committed_marks);
+                        }
                     }
                 }
 
