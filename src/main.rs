@@ -68,10 +68,12 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
         }
     };
 
-    let base_interval_height: IF =
-            spec_tuple_tick_heights
-                .as_str().parse()
-                .expect("Spec tuple should have a float height.");
+    let base_interval_spec = TickSpec {
+        height: spec_tuple_tick_heights
+                    .as_str().parse()
+                    .expect("Spec tuple should have a float height."),
+        format: TickFormat::Nothing
+    };
 
     let next_specs = match may_spec_follow {
         None => IndexingSpec::Nothing,
@@ -135,8 +137,8 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
     };
 
     PartitionSpec {
-        base_interval_height, next_specs, quantities,
-        override_tick_heights: BTreeMap::new(),
+        base_interval_spec, next_specs, quantities,
+        override_tick_specs: BTreeMap::new(),
     }
 }
 
@@ -386,13 +388,34 @@ pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).expect("not_nan: Input num
 #[derive(Clone, Debug)]
 pub struct PartitionSpec {
     quantities: Vec<IF>,
-    base_interval_height: IF,
-    override_tick_heights: BTreeMap<usize, IF>,
+    base_interval_spec: TickSpec,
+    override_tick_specs: BTreeMap<usize, TickSpec>,
     next_specs: IndexingSpec
 }
 
 pub fn repeat (count: usize) -> Vec<IF> {
     (0..count).map(|_| 1.).collect()
+}
+
+#[derive(Clone, Debug)]
+pub struct TickSpec {
+    height: IF,
+    format: TickFormat
+}
+
+#[derive(Clone, Debug)]
+pub enum TickFormat {
+    Nothing,
+    Debug
+}
+
+impl TickFormat {
+    pub fn run (&self, x: IF) -> Option<String> {
+        match self {
+            TickFormat::Nothing => None,
+            TickFormat::Debug => Some(format!("{}", x))
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -429,7 +452,7 @@ impl PartitionSpec {
             let subinterval = Interval {
                 start: old_point,
                 end: point,
-                height: self.base_interval_height * interval.height
+                height: self.base_interval_spec.height * interval.height
             };
 
             subintervals.push(subinterval);
@@ -488,14 +511,14 @@ impl PartitionSpec {
             if !first || inclusivity.0 {
                 let point = subinterval.start;
 
-                let overridden_height = match self.override_tick_heights.get(&i) {
-                    Some(factor) => interval.height * factor,
-                    None => interval.height * self.base_interval_height
-                };
+                let spec = self.override_tick_specs.get(&i).unwrap_or(&self.base_interval_spec);
+
+                let label = spec.format.run(point);
+                let label = label.map(|text| Label { text });
 
                 let tick_meta = TickMeta {
-                    height: overridden_height,
-                    label: None,
+                    height: interval.height * spec.height,
+                    label,
                     offset: TickOffset::Vertical(0.)
                 };
 
@@ -510,14 +533,14 @@ impl PartitionSpec {
             if last && inclusivity.1 {
                 let point = subinterval.end;
 
-                let overridden_height = match self.override_tick_heights.get(&(i + 1)) {
-                    Some(factor) => interval.height * factor,
-                    None => interval.height * self.base_interval_height
-                };
+                let spec = self.override_tick_specs.get(&(i + 1)).unwrap_or(&self.base_interval_spec);
+
+                let label = spec.format.run(point);
+                let label = label.map(|text| Label { text });
 
                 let tick_meta = TickMeta {
-                    height: overridden_height,
-                    label: None,
+                    height: interval.height * spec.height,
+                    label,
                     offset: TickOffset::Vertical(0.)
                 };
 
