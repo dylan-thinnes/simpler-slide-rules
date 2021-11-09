@@ -406,14 +406,16 @@ pub struct TickSpec {
 #[derive(Clone, Debug)]
 pub enum TickFormat {
     Nothing,
-    Debug
+    Debug,
+    Hardcoded(String)
 }
 
 impl TickFormat {
     pub fn run (&self, x: IF) -> Option<String> {
         match self {
             TickFormat::Nothing => None,
-            TickFormat::Debug => Some(format!("{}", x))
+            TickFormat::Debug => Some(format!("{}", x)),
+            TickFormat::Hardcoded(s) => Some(s.clone())
         }
     }
 }
