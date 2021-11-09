@@ -270,7 +270,8 @@ impl Tick {
 
     fn to_json (&self) -> String {
         format!
-          ( "{{ \"pre_pos\": {}, \"post_pos\": {}, \"height\": {}, \"offset\": {} }}"
+          ( "{{ \"pre_pos\": {:.*}, \"post_pos\": {}, \"height\": {}, \"offset\": {} }}"
+          , 8 - (self.pre_pos.log(10.).ceil() as usize).min(0)
           , self.pre_pos
           , self.post_pos
           , self.meta.height
