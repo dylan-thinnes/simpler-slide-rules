@@ -452,7 +452,11 @@ impl TickFormat {
     pub fn run (&self, x: IF) -> Option<String> {
         match self {
             TickFormat::Nothing => None,
-            TickFormat::Debug => Some(format!("{}", x)),
+            TickFormat::Debug => {
+                // account for floating-point imprecision
+                // TODO: this introduces a whole host of OTHER problems - fix properly...
+                Some(format!("{}", (x * 100_000_000.).round() / 100_000_000.))
+            },
             TickFormat::Hardcoded(s) => Some(s.clone())
         }
     }
