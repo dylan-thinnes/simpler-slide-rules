@@ -172,7 +172,7 @@ impl LayeredMarks {
     }
 
     fn collapse_layer (&mut self) {
-        let top = self.0.pop().unwrap();
+        let top = self.0.pop().expect("Error: LayeredMarks was empty!");
         match self.0.last_mut() {
             None => {
                 eprintln!("Warning: Tried to collapse only layer on LayeredMarks stack!");
@@ -189,7 +189,7 @@ impl LayeredMarks {
     }
 
     fn insert (&mut self, tick: Tick) -> bool {
-        self.0.last_mut().unwrap().insert(tick)
+        self.0.last_mut().expect("Error: LayeredMarks was empty!").insert(tick)
     }
 
     pub fn no_overlap (&self, tick: &Tick, minimum_distance: InternalFloat) -> bool {
@@ -306,7 +306,7 @@ impl Marks {
     }
 }
 
-pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).unwrap() }
+pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).expect("not_nan: Input number was NaN!") }
 
 #[derive(Clone)]
 pub struct PartitionSpec {
