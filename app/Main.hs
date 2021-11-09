@@ -70,7 +70,7 @@ main = do
         RenderSettings
           { heightMultiplier = 0.02
           , textMultiplier = 0.3
-          , padding = 0
+          , padding = 0.02
           , lineWidth = 0
           , xPow = 3
           , yPow = 3
@@ -106,10 +106,10 @@ instance NFData (FixedPrec P20) where
 renderTick = tickToDiagram
 renderTickStatic = tickToDiagramStatic
 renderTicks renderSettings ticks =
-    foldMap (renderTick renderSettings) ticks
+    D.frame (realToFrac $ padding renderSettings) $ foldMap (renderTick renderSettings) ticks
 writeRepToFile path rep = do
     let options = D.SVGOptions (D.mkWidth 2000) Nothing (T.pack "") [] True
-    let svgDoc = D.renderDia D.SVG options (D.frame 0.1 rep)
+    let svgDoc = D.renderDia D.SVG options rep
     let bs = Graphics.Svg.Core.renderBS svgDoc
     Data.ByteString.Lazy.writeFile path bs
 
