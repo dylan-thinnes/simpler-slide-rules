@@ -1,7 +1,9 @@
 integer = @{ ("+"|"-"|"")? ~ ASCII_DIGIT+ }
 floating = @{ ("+"|"-"|"")? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? }
 
-quantities = { integer }
+quantities = { standalone_quantity | multiple_quantities }
+standalone_quantity = { integer }
+multiple_quantities = { "[" ~ integer ~ ("," ~ integer)* ~ "]" }
 tick_heights = { floating }
 
 range = { range_start ~ (".." ~ range_end)? }

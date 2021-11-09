@@ -109,10 +109,31 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
     let mut spec_tuple_inners = spec_tuple.into_inner();
     let spec_tuple_quantities = spec_tuple_inners.next().unwrap();
     let spec_tuple_tick_heights = spec_tuple_inners.next().unwrap();
-    let quantities =
-            spec_tuple_quantities
-                .as_str().parse()
-                .expect("Spec tuple should have an int.");
+
+    let spec_tuple_quantities = spec_tuple_quantities.into_inner().next().unwrap();
+    let quantities: Vec<IF> = match spec_tuple_quantities.as_rule() {
+        Rule::standalone_quantity => {
+            let standalone =
+                    spec_tuple_quantities
+                        .as_str().parse()
+                        .expect("Spec tuple standalone_quantity should have an int.");
+
+            repeat(standalone)
+        },
+        Rule::multiple_quantities => {
+            let mut multiple = vec![];
+            for quantity in spec_tuple_quantities.into_inner() {
+                let val = quantity.as_str().parse().expect("Spec tuple multiple_quantities should be ints.");
+                multiple.push(val);
+            }
+
+            multiple
+        },
+        _ => {
+            panic!("Error: quantities was not one of `standalone_quantity` or `multiple_quantities`");
+        }
+    };
+
     let base_interval_height: IF =
             spec_tuple_tick_heights
                 .as_str().parse()
@@ -180,9 +201,8 @@ pub fn ast_spec_into_spec (spec: Pair<Rule>) -> PartitionSpec {
     };
 
     PartitionSpec {
-        base_interval_height, next_specs,
+        base_interval_height, next_specs, quantities,
         override_tick_heights: BTreeMap::new(),
-        quantities: repeat(quantities)
     }
 }
 
