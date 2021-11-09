@@ -78,6 +78,13 @@ pub fn main () {
     custom_next_specs.push((2, Some(c2_3_spec)));
     custom_next_specs.push((6, Some(c4_9_spec)));
     c_spec.next_specs = IndexingSpec::Custom(custom_next_specs);
+    println!("{:?}", c_spec);
+
+    let src = fs::read_to_string("example").expect("Could not read example.");
+    let top_level = Grammar::parse(Rule::top_level, &src).expect("Parse unsuccessful.").next().unwrap();
+    let ast_spec: Pair<Rule> = top_level.into_inner().next().unwrap();
+    let spec: PartitionSpec = ast_spec_into_spec(ast_spec);
+    println!("{:?}", spec);
 
     let config = Config {
         minimum_distance: 0.,
@@ -86,7 +93,7 @@ pub fn main () {
         }
     };
 
-    let marks = c_spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
+    let marks = spec.run_top(&Interval { start: 1., end: 10., height: 1. }, &config);
     for tick in &marks.0[0].ticks {
         println!("{}", tick.to_json());
     }
@@ -403,7 +410,7 @@ impl Marks {
 
 pub fn not_nan (f: IF) -> NotNan<IF> { NotNan::new(f).expect("not_nan: Input number was NaN!") }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PartitionSpec {
     quantities: Vec<IF>,
     base_interval_height: IF,
