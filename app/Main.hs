@@ -69,7 +69,7 @@ main = do
   let settings =
         RenderSettings
           { heightMultiplier = 0.02
-          , textMultiplier = 1
+          , textMultiplier = 0.3
           , padding = 0
           , lineWidth = 0
           , xPow = 3
@@ -241,9 +241,9 @@ data Label = Label
 
 instance FromJSON Label where
   parseJSON = withObject "Label" $ \obj -> do
-    let _fontSize = 10
+    let _fontSize = 1
     _text <- obj .: "text"
-    let _textAnchor = TextAnchor { _xPct = 0, _yPct = 0 }
+    let _textAnchor = TextAnchor { _xPct = 0.5, _yPct = 0 }
     let _tickAnchor = FromTopAbs 0
     let _anchorOffset = D.V2 0 0
     pure $ Label { _text, _fontSize, _textAnchor, _tickAnchor, _anchorOffset }
