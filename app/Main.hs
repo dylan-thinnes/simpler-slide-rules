@@ -187,7 +187,8 @@ instance FromJSON Tick where
     offset <- v .:? "offset" .!= Vertical 0
     let _start = 0
     _end <- v .: "height"
-    pure $ Tick { prePos, postPos, offset, info = TickInfo { _start, _end, _mlabel = Nothing } }
+    _mlabel <- v .:? "label"
+    pure $ Tick { prePos, postPos, offset, info = TickInfo { _start, _end, _mlabel } }
 
 truePos :: TickF a -> InternalFloat
 truePos Tick { postPos, offset } =
@@ -237,6 +238,15 @@ data Label = Label
     , _anchorOffset :: D.V2 InternalFloat
     }
     deriving (Show, Generic)
+
+instance FromJSON Label where
+  parseJSON = withObject "Label" $ \obj -> do
+    let _fontSize = 10
+    _text <- obj .: "text"
+    let _textAnchor = TextAnchor { _xPct = 0, _yPct = 0 }
+    let _tickAnchor = FromTopAbs 0
+    let _anchorOffset = D.V2 0 0
+    pure $ Label { _text, _fontSize, _textAnchor, _tickAnchor, _anchorOffset }
 
 instance NFData Label
 

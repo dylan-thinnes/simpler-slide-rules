@@ -161,9 +161,23 @@ pub struct Tick {
 
 #[derive(Debug, Clone)]
 pub struct TickMeta {
-    label: Option<String>,
+    label: Option<Label>,
     height: IF,
     offset: TickOffset
+}
+
+#[derive(Debug, Clone)]
+pub struct Label {
+    text: String
+}
+
+impl Label {
+    fn to_json (&self) -> String {
+        format!
+          ( "{{ \"text\": \"{}\" }}"
+          , self.text
+          )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -204,12 +218,16 @@ impl Tick {
 
     fn to_json (&self) -> String {
         format!
-          ( "{{ \"pre_pos\": {:.*}, \"post_pos\": {}, \"height\": {}, \"offset\": {} }}"
+          ( "{{ \"pre_pos\": {:.*}, \"post_pos\": {}, \"height\": {}, \"offset\": {}, \"label\": {} }}"
           , 8 - (self.pre_pos.log(10.).ceil() as usize).min(0)
           , self.pre_pos
           , self.post_pos
           , self.meta.height
           , self.meta.offset.to_json()
+          , match &self.meta.label {
+              None => String::from("null"),
+              Some(label) => label.to_json()
+            }
           )
     }
 }
