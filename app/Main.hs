@@ -66,7 +66,16 @@ main = do
 
   validTicks <- concat <$> zipWithM handleParse [1..] inputs
 
-  let diagram = renderTicks def validTicks
+  let settings =
+        RenderSettings
+          { heightMultiplier = 0.02
+          , textMultiplier = 1
+          , padding = 0
+          , lineWidth = 0
+          , xPow = 3
+          , yPow = 3
+          }
+  let diagram = renderTicks settings validTicks
 
   args <- getArgs
   let filename :: String
@@ -299,14 +308,4 @@ data RenderSettings = RenderSettings
     , lineWidth :: InternalFloat
     , xPow :: Int
     , yPow :: Int
-    }
-
-instance Default RenderSettings where
-  def = RenderSettings
-    { heightMultiplier = 1
-    , textMultiplier = 1
-    , padding = 0
-    , lineWidth = 0
-    , xPow = 3
-    , yPow = 3
     }
